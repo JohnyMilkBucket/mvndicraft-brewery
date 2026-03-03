@@ -6,6 +6,115 @@
 <title>MvndiCraft Brewery Guide</title>
 <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ════════════════════════════════════
+// DOWNLOAD APP + EXPORT DATA
+// ════════════════════════════════════
+var DATA_KEYS = [
+  'mvndi_username','mvndi_barrels','mvndi_log','mvndi_cook_timers',
+  'mvndi_vol','mvndi_v'
+];
+
+function gatherData() {
+  var data = {};
+  DATA_KEYS.forEach(function(k) {
+    var v = localStorage.getItem(k);
+    if (v !== null) data[k] = v;
+  });
+  return data;
+}
+
+function triggerJsonDownload(data) {
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mvndi-data.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+var GITHUB_RELEASES = 'https://github.com/JohnyMilkBucket/mvndicraft-brewery/releases/latest';
+
+
+
+window.navDownloadClick = function() {
+  if (window.electronAPI) {
+    // Inside app: go to GitHub releases for update
+    if (window.electronAPI && window.electronAPI.openExternal) {
+      window.electronAPI.openExternal(GITHUB_RELEASES);
+    } else {
+      window.open(GITHUB_RELEASES, '_blank');
+    }
+  } else {
+    // In browser: export data + download from Drive
+    downloadApp();
+  }
+};
+
+window.downloadApp = function() {
+  triggerJsonDownload(gatherData());
+  setTimeout(function() {
+    window.location.href = 'https://github.com/JohnyMilkBucket/mvndicraft-brewery/releases/latest/download/MvndiCraft-Brewery-Setup.exe';
+  }, 800);
+  showToast('Exporting your data + starting download...');
+};
+
+window.exportData = function() {
+  triggerJsonDownload(gatherData());
+  showToast('Data exported as mvndi-data.json');
+};
+
+window.importData = async function() {
+  // In Electron: use native file dialog
+  if (window.electronAPI && window.electronAPI.importData) {
+    var data = await window.electronAPI.importData();
+    if (!data) { showToast('No file selected or invalid file.'); return; }
+    showConfirm(
+      'Import this data? It will overwrite your current brewery data.',
+      function() {
+        Object.entries(data).forEach(function(entry) {
+          localStorage.setItem(entry[0], entry[1]);
+        });
+        showToast('Data imported! Reloading...');
+        setTimeout(function() { location.reload(); }, 1200);
+      },
+      'IMPORT & OVERWRITE'
+    );
+    return;
+  }
+  // In browser: use file input
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        showConfirm(
+          'Import this data? It will overwrite your current brewery data.',
+          function() {
+            Object.entries(data).forEach(function(entry) {
+              localStorage.setItem(entry[0], entry[1]);
+            });
+            showToast('Data imported! Reloading...');
+            setTimeout(function() { location.reload(); }, 1200);
+          },
+          'IMPORT & OVERWRITE'
+        );
+      } catch(err) {
+        showToast('Invalid file — could not read data.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+};
+</script>
 <style>
 :root{
   --bg:#0d0a07;--bg2:#130e08;--panel:#1a1108;--panel2:#211408;
@@ -302,8 +411,11 @@ nav{height:56px;background:linear-gradient(180deg,#1c1005,var(--bg2));border-bot
 /* TOAST */
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border2);padding:8px 20px;font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;color:var(--amber2);z-index:9000;opacity:0;transition:opacity .25s;pointer-events:none;}
 #toast.show{opacity:1;}
-::-webkit-scrollbar-track{background:var(--bg);}
-::-webkit-scrollbar-thumb{background:var(--border2);}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--amber2),var(--amber));border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--amber2);}
+::-webkit-scrollbar-corner{background:transparent;}
 
 /* ═══════════════════════════════════
    SPLASH SCREEN
@@ -337,25 +449,6 @@ nav{height:56px;background:linear-gradient(180deg,#1c1005,var(--bg2));border-bot
 .up-btn{margin-top:32px;padding:16px 56px;background:rgba(212,134,10,.1);border:1px solid var(--amber);color:var(--amber2);font-family:'Cinzel',serif;font-size:13px;letter-spacing:4px;cursor:pointer;transition:all .25s;}
 .up-btn:hover{background:rgba(212,134,10,.22);box-shadow:0 0 24px rgba(245,166,35,.18);}
 .up-btn:disabled{opacity:.35;cursor:not-allowed;}
-
-/* SONG LIBRARY CARDS */
-.song-card{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);cursor:pointer;transition:all .2s;background:var(--panel2);}
-.song-card:hover{border-color:var(--border2);background:rgba(58,40,16,.5);}
-.song-card.active{border-color:var(--amber);background:rgba(212,134,10,.08);}
-.song-card-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background .2s;}
-.song-card.active .song-card-dot{background:var(--amber2);box-shadow:0 0 6px var(--amber);}
-.song-card-info{flex:1;}
-.song-card-name{font-family:'Cinzel',serif;font-size:11px;color:var(--foam);letter-spacing:.5px;}
-.song-card.active .song-card-name{color:var(--amber2);}
-.song-card-desc{font-size:11px;color:var(--text3);margin-top:2px;}
-.song-card-btn{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;transition:color .15s;}
-.song-card-btn:hover{color:var(--amber2);}
-.song-card.active .song-card-btn{color:var(--amber);}
-
-/* PLAYER BAR keep-playing indicator */
-#player-keep{background:none;border:none;cursor:pointer;font-family:'Cinzel',serif;font-size:7px;letter-spacing:1px;color:var(--text3);padding:2px 6px;border:1px solid transparent;transition:all .15s;}
-#player-keep.on{color:var(--amber);border-color:rgba(212,134,10,.3);}
-#player-keep:hover{color:var(--amber2);}
 
 /* VOLUME SLIDER */
 .vol-wrap{display:flex;align-items:center;gap:12px;}
@@ -399,16 +492,10 @@ nav{height:56px;background:linear-gradient(180deg,#1c1005,var(--bg2));border-bot
     <button class="nav-tab" onclick="showPage('stats')" id="tab-stats">📊 STATS</button>
     <button class="nav-tab" onclick="showPage('settings')" id="tab-settings">⚙ SETTINGS</button>
   </div>
-  <div class="nav-right" style="gap:0;padding:0;">
-    <!-- Mini music player -->
-    <div id="player-bar" style="display:flex;align-items:center;gap:6px;padding:0 12px;border-left:1px solid var(--border);height:100%;opacity:.55;transition:opacity .3s;">
-      <button onclick="playerPrev()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px;transition:color .15s;" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--text3)'">⏮</button>
-      <button id="player-btn" onclick="playerToggle()" style="background:none;border:none;color:var(--amber2);cursor:pointer;font-size:18px;padding:2px 5px;transition:transform .15s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">♪</button>
-      <button onclick="playerNext()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px;transition:color .15s;" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--text3)'">⏭</button>
-      <span id="player-song-name" style="font-family:'Cinzel',serif;font-size:7.5px;letter-spacing:1px;color:var(--text3);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">No music</span>
-      <button id="player-keep" onclick="playerToggleKeep()" title="Keep music looping in app">LOOP</button>
-    </div>
-    <div class="time-note" style="padding:0 14px;border-left:1px solid var(--border);">1 YEAR = 1 MC DAY<strong>= 20 REAL MINUTES</strong></div>
+  <div class="nav-right" style="gap:10px;">
+    <div class="time-note">1 YEAR = 1 MC DAY<strong>= 20 REAL MINUTES</strong></div>
+    <button id="nav-download-btn" onclick="navDownloadClick()" style="padding:5px 14px;background:rgba(212,134,10,.12);border:1px solid var(--amber);color:var(--amber2);font-family:'Cinzel',serif;font-size:8px;letter-spacing:2px;cursor:pointer;transition:all .2s;flex-shrink:0;" onmouseover="this.style.background='rgba(212,134,10,.28)'" onmouseout="this.style.background='rgba(212,134,10,.12)'">⬇ DOWNLOAD APP</button>
+    <button onclick="lockUp()" style="padding:5px 13px;background:none;border:1px solid var(--border);color:var(--text3);font-family:'Cinzel',serif;font-size:8px;letter-spacing:2px;cursor:pointer;transition:all .2s;flex-shrink:0;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">🔒 LOCK UP</button>
   </div>
 </nav>
 
@@ -612,30 +699,12 @@ nav{height:56px;background:linear-gradient(180deg,#1c1005,var(--bg2));border-bot
     <div class="settings-section">
       <div class="settings-h">AUDIO</div>
       <div class="settings-row">
-        <div><div class="settings-label">Master Volume</div><div class="settings-desc">Controls all alarm and music volume.</div></div>
+        <div><div class="settings-label">Master Volume</div><div class="settings-desc">Controls alarm and startup music volume.</div></div>
         <div class="vol-wrap">
           <span style="font-size:14px;color:var(--text3);">🔇</span>
           <input class="vol-slider" id="vol-slider" type="range" min="0" max="100" value="70" oninput="updateVolume(this.value)">
           <span style="font-size:14px;color:var(--text3);">🔊</span>
           <span class="vol-val" id="vol-val">70%</span>
-        </div>
-      </div>
-
-      <div class="settings-row" style="align-items:flex-start;padding-top:16px;">
-        <div style="flex:1;">
-          <div class="settings-label">Song Library</div>
-          <div class="settings-desc">Choose which track plays on startup and in the app. Music loops until you stop it.</div>
-        </div>
-      </div>
-      <div id="song-library" style="display:flex;flex-direction:column;gap:8px;margin-top:4px;margin-bottom:4px;">
-        <!-- populated by renderSettings() -->
-      </div>
-
-      <div class="settings-row" style="border-top:1px solid var(--border);margin-top:8px;padding-top:14px;">
-        <div><div class="settings-label">Now Playing</div><div class="settings-desc">Control music from anywhere in the app using the ♪ player in the top bar.</div></div>
-        <div style="display:flex;gap:8px;">
-          <button class="settings-btn settings-btn-amber" onclick="playMusic(currentSongId,true);showToast('Now playing: '+SONGS[currentSongId].label)" style="font-size:8px;">▶ PLAY</button>
-          <button class="settings-btn settings-btn-red" onclick="stopMusic();showToast('Music stopped.')" style="font-size:8px;">■ STOP</button>
         </div>
       </div>
     </div>
@@ -657,6 +726,24 @@ nav{height:56px;background:linear-gradient(180deg,#1c1005,var(--bg2));border-bot
       <div class="settings-row">
         <div><div class="settings-label">Active Cook Timers</div></div>
         <div class="settings-stat" id="stat-timers">—</div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-h">DATA TRANSFER</div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Export Data</div>
+          <div class="settings-desc">Save all your barrels, logs and timers to a file.</div>
+        </div>
+        <button class="settings-btn settings-btn-amber" onclick="exportData()">⬆ EXPORT</button>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Import Data</div>
+          <div class="settings-desc">Load a previously exported mvndi-data.json file.</div>
+        </div>
+        <button class="settings-btn settings-btn-amber" onclick="importData()">⬇ IMPORT</button>
       </div>
     </div>
 
@@ -735,17 +822,13 @@ function showToast(msg){
 
 // ════════════════════════════════════
 // ════════════════════════════════════
-// MUSIC ENGINE
+// INTRO MUSIC
 // ════════════════════════════════════
 let masterVolume = parseFloat(localStorage.getItem('mvndi_vol') ?? '0.7');
-let currentSongId = localStorage.getItem('mvndi_song') || 'the_brew_awaits';
-let musicCtx = null;
-let musicNodes = [];
-let musicPlaying = false;
-let musicLooping = false;
-let _loopTimer = null;
+let _introCtx = null;
+let _introNodes = [];
+let _introMaster = null;
 
-// ── Audio helpers ─────────────────────────────────────────────
 function _note(ctx, dest, freq, type, amp, t, dur) {
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.connect(g); g.connect(dest); o.type = type;
@@ -755,7 +838,7 @@ function _note(ctx, dest, freq, type, amp, t, dur) {
   g.gain.setValueAtTime(amp, t + dur*0.62);
   g.gain.linearRampToValueAtTime(0, t + dur + 0.18);
   o.start(t); o.stop(t + dur + 0.28);
-  musicNodes.push(o);
+  _introNodes.push(o);
 }
 function _pad(ctx, dest, freq, amp, t, dur) {
   const o = ctx.createOscillator(), g = ctx.createGain();
@@ -763,220 +846,86 @@ function _pad(ctx, dest, freq, amp, t, dur) {
   o.frequency.setValueAtTime(freq, t);
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(amp, t + 3.5);
-  g.gain.setValueAtTime(amp, t + dur - 4);
+  g.gain.setValueAtTime(amp, Math.max(t+3.6, t + dur - 4));
   g.gain.linearRampToValueAtTime(0, t + dur);
   o.start(t); o.stop(t + dur + 0.1);
-  musicNodes.push(o);
+  _introNodes.push(o);
 }
-function _reverb(ctx, secs, wet) {
+function _makeReverb(ctx, secs, wet) {
   const size = ctx.sampleRate * secs;
   const buf = ctx.createBuffer(2, size, ctx.sampleRate);
   for (let c = 0; c < 2; c++) {
     const d = buf.getChannelData(c);
-    for (let i = 0; i < size; i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/size, 2.6);
+    for (let i = 0; i < size; i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/size,2.6);
   }
   const conv = ctx.createConvolver(); conv.buffer = buf;
   const g = ctx.createGain(); g.gain.value = wet;
   conv.connect(g); g.connect(ctx.destination);
-  return conv; // connect master -> conv to add reverb
+  return conv;
 }
 
-// ── Song Library ──────────────────────────────────────────────
-const SONGS = {
-  the_brew_awaits: {
-    label: 'The Brew Awaits',
-    desc: 'Gentle pentatonic — serene & welcoming',
-    build(ctx) {
-      const S = [146.83,164.81,185,220,246.94,293.66,329.63,369.99,440,493.88,587.33,659.25,739.99,880];
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0, ctx.currentTime);
-      master.gain.linearRampToValueAtTime(masterVolume*0.52, ctx.currentTime+2.2);
-      master.connect(ctx.destination);
-      const rev = _reverb(ctx, 3.0, 0.38); master.connect(rev);
-      let t = ctx.currentTime + 1.0;
-      // Phrase A
-      [[5,.9],[7,.9],[8,1.2],[10,1.4],[11,1.0],[10,.8],[8,1.0],[7,.7]].forEach(([n,d])=>{
-        _note(ctx,master,S[n],'sine',0.20,t,d);
-        _note(ctx,master,S[n]*2,'triangle',0.045,t,d);
-        t+=d*.72;
-      });
-      t+=0.5;
-      // Phrase B
-      [[6,1.2],[5,1.9],[7,.8],[8,.8],[10,1.0],[11,1.2],[12,2.4]].forEach(([n,d])=>{
-        _note(ctx,master,S[n],'sine',0.20,t,d);
-        _note(ctx,master,S[n]*2,'triangle',0.04,t,d);
-        t+=d*.72;
-      });
-      t+=0.3;
-      // Phrase C — resolve
-      [[10,.9],[8,.9],[7,.9],[5,3.8]].forEach(([n,d])=>{
-        _note(ctx,master,S[n],'sine',0.22,t,d);
-        _note(ctx,master,S[n]*2,'triangle',0.05,t,d);
-        t+=d*.72;
-      });
-      _pad(ctx,master,S[0],0.07,ctx.currentTime,44);
-      _pad(ctx,master,S[3],0.03,ctx.currentTime+9,32);
-      return t - ctx.currentTime + 2;
-    }
-  },
-
-  tavern_night: {
-    label: 'Tavern Night',
-    desc: 'Warm minor — lively & tavern-like',
-    build(ctx) {
-      // A natural minor
-      const S = [110,123.47,130.81,146.83,164.81,174.61,196,220,246.94,261.63,293.66,329.63,349.23,392,440];
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0,ctx.currentTime);
-      master.gain.linearRampToValueAtTime(masterVolume*0.50,ctx.currentTime+1.6);
-      master.connect(ctx.destination);
-      const rev = _reverb(ctx,1.8,0.26); master.connect(rev);
-      let t = ctx.currentTime + 0.6;
-      const phrases = [
-        [7,.55],[9,.55],[10,.55],[12,.7],[10,.55],[9,.55],[7,1.0],
-        [5,.55],[7,.55],[9,.55],[10,.7],[9,.55],[7,.55],[5,1.2],
-        [7,.5],[10,.5],[12,.5],[14,.65],[12,.5],[10,.5],[9,1.4],
-        [7,.55],[9,.55],[7,.55],[5,.55],[4,.55],[5,.55],[7,1.8],
-        [7,.55],[9,.55],[10,.55],[12,.7],[10,.55],[9,.55],[7,2.2],
-      ];
-      phrases.forEach(([n,d])=>{
-        _note(ctx,master,S[n],'triangle',0.17,t,d);
-        _note(ctx,master,S[n]*2,'sine',0.04,t,d);
-        t+=d*.78;
-      });
-      // Bass
-      let tb=ctx.currentTime+0.6;
-      [0,0,3,0,5,0,3,0,0,0,3,0,5,3,0,0].forEach(n=>{
-        _note(ctx,master,S[n],'sine',0.09,tb,0.4); tb+=1.6;
-      });
-      _pad(ctx,master,S[0],0.06,ctx.currentTime,48);
-      return t - ctx.currentTime + 2;
-    }
-  },
-
-  ancient_cellar: {
-    label: 'Ancient Cellar',
-    desc: 'Slow atmospheric drone — deep & mysterious',
-    build(ctx) {
-      const S = [82.41,87.31,98,110,123.47,130.81,146.83,164.81,174.61,196,220,246.94,261.63,293.66];
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0,ctx.currentTime);
-      master.gain.linearRampToValueAtTime(masterVolume*0.54,ctx.currentTime+3.0);
-      master.connect(ctx.destination);
-      const rev = _reverb(ctx,4.8,0.58); master.connect(rev);
-      let t = ctx.currentTime + 2.2;
-      [[7,3.2],[5,2.8],[4,3.5],[3,2.0],[5,2.5],[7,2.8],[9,3.0],[10,2.5],[9,2.8],[7,3.5],[5,2.8],[4,2.5],[3,4.5],[5,2.5],[7,2.8],[9,3.5],[7,4.5]].forEach(([n,d])=>{
-        _note(ctx,master,S[n],'sine',0.16,t,d*0.85);
-        _note(ctx,master,S[n]*1.5,'sine',0.04,t+0.2,d*0.65);
-        t+=d*0.85;
-      });
-      _pad(ctx,master,S[0],0.08,ctx.currentTime,54);
-      _pad(ctx,master,S[4],0.04,ctx.currentTime+5,46);
-      _pad(ctx,master,S[7],0.03,ctx.currentTime+12,36);
-      return t - ctx.currentTime + 3;
-    }
-  },
-
-  harvest_festival: {
-    label: 'Harvest Festival',
-    desc: 'Bright major — joyful & celebratory',
-    build(ctx) {
-      const S = [196,220,246.94,293.66,329.63,392,440,493.88,587.33,659.25,783.99,880];
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0,ctx.currentTime);
-      master.gain.linearRampToValueAtTime(masterVolume*0.48,ctx.currentTime+1.4);
-      master.connect(ctx.destination);
-      const rev = _reverb(ctx,1.5,0.20); master.connect(rev);
-      let t = ctx.currentTime + 0.5;
-      const phrases = [
-        [0,.45],[2,.45],[4,.45],[5,.6],[4,.45],[2,.45],[0,.9],
-        [2,.45],[4,.45],[5,.45],[7,.6],[5,.45],[4,.45],[2,.9],
-        [4,.45],[5,.45],[7,.45],[9,.65],[7,.45],[5,.45],[4,1.1],
-        [5,.45],[4,.45],[2,.45],[0,.6],[2,.45],[0,.45],[0,.9],
-        [5,.4],[7,.4],[9,.4],[11,.55],[9,.4],[7,.4],[5,.85],
-        [7,.4],[9,.4],[11,.4],[5,.55],[7,.4],[5,.4],[4,1.8],
-      ];
-      phrases.forEach(([n,d])=>{
-        _note(ctx,master,S[n],'triangle',0.16,t,d);
-        _note(ctx,master,S[n]*2,'sine',0.04,t,d*0.6);
-        t+=d*0.76;
-      });
-      let tb=ctx.currentTime+0.5;
-      [0,0,2,4,0,2,4,2,4,5,4,2,0,0,4,0].forEach(n=>{
-        _note(ctx,master,S[n]*0.5,'sine',0.10,tb,0.35); tb+=1.4;
-      });
-      _pad(ctx,master,S[0]*0.5,0.05,ctx.currentTime,46);
-      return t - ctx.currentTime + 2;
-    }
-  }
-};
-
-// ── Playback control ──────────────────────────────────────────
-function stopMusic(delay=300) {
-  if (_loopTimer){ clearTimeout(_loopTimer); _loopTimer=null; }
-  musicPlaying=false; musicLooping=false;
-  if (musicCtx){
-    const ctx=musicCtx; musicCtx=null;
-    setTimeout(()=>{
-      musicNodes.forEach(n=>{try{n.stop();}catch(e){}});
-      musicNodes=[];
-      try{ctx.close();}catch(e){}
-    },delay);
-  }
-  updatePlayerUI();
-}
-
-function playMusic(songId, loop=true) {
-  stopMusic(150);
-  if (songId) currentSongId=songId;
-  if (!SONGS[currentSongId]) currentSongId='the_brew_awaits';
-  musicLooping=loop;
-  localStorage.setItem('mvndi_song',currentSongId);
+function playIntroMusic() {
+  stopIntroMusic();
   try {
-    musicCtx=new(window.AudioContext||window.webkitAudioContext)();
-    if(musicCtx.state==='suspended') musicCtx.resume();
-    const dur = SONGS[currentSongId].build(musicCtx);
-    musicPlaying=true;
-    if(musicLooping){
-      _loopTimer=setTimeout(()=>{ if(musicLooping) playMusic(currentSongId,true); }, (dur-1.2)*1000);
-    }
-  } catch(e){ console.warn('Music error:',e); }
-  updatePlayerUI();
+    _introCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_introCtx.state === 'suspended') _introCtx.resume();
+    const ctx = _introCtx;
+    const master = ctx.createGain();
+    _introMaster = master;
+    master.gain.setValueAtTime(0, ctx.currentTime);
+    master.gain.linearRampToValueAtTime(masterVolume * 0.52, ctx.currentTime + 2.2);
+    master.connect(ctx.destination);
+    const rev = _makeReverb(ctx, 3.0, 0.38); master.connect(rev);
+
+    // D pentatonic
+    const S = [146.83,164.81,185,220,246.94,293.66,329.63,369.99,440,493.88,587.33,659.25,739.99,880];
+    let t = ctx.currentTime + 1.0;
+    // Phrase A — gentle rising
+    [[5,.9],[7,.9],[8,1.2],[10,1.4],[11,1.0],[10,.8],[8,1.0],[7,.7]].forEach(([n,d])=>{
+      _note(ctx,master,S[n],'sine',0.20,t,d);
+      _note(ctx,master,S[n]*2,'triangle',0.045,t,d);
+      t+=d*.72;
+    });
+    t+=0.5;
+    // Phrase B — peak & breathe
+    [[6,1.2],[5,1.9],[7,.8],[8,.8],[10,1.0],[11,1.2],[12,2.4]].forEach(([n,d])=>{
+      _note(ctx,master,S[n],'sine',0.20,t,d);
+      _note(ctx,master,S[n]*2,'triangle',0.04,t,d);
+      t+=d*.72;
+    });
+    t+=0.3;
+    // Phrase C — resolve
+    [[10,.9],[8,.9],[7,.9],[5,3.8]].forEach(([n,d])=>{
+      _note(ctx,master,S[n],'sine',0.22,t,d);
+      _note(ctx,master,S[n]*2,'triangle',0.05,t,d);
+      t+=d*.72;
+    });
+    _pad(ctx,master,S[0],0.07,ctx.currentTime,44);
+    _pad(ctx,master,S[3],0.03,ctx.currentTime+9,32);
+  } catch(e) { console.warn('Intro music error:', e); }
 }
 
-function fadeOutMusic(ms=2500) {
-  if(!musicCtx||!musicPlaying) return;
-  musicLooping=false;
-  if(_loopTimer){clearTimeout(_loopTimer);_loopTimer=null;}
-  setTimeout(()=>stopMusic(0), ms);
-  updatePlayerUI();
-}
-
-// ── Mini player UI ────────────────────────────────────────────
-function updatePlayerUI() {
-  const btn=document.getElementById('player-btn');
-  const lbl=document.getElementById('player-song-name');
-  const bar=document.getElementById('player-bar');
-  if(!btn) return;
-  if(musicPlaying){
-    btn.textContent='⏸'; btn.title='Pause';
-    if(lbl) lbl.textContent=SONGS[currentSongId]?.label||'';
-    if(bar) bar.style.opacity='1';
-  } else {
-    btn.textContent='♪'; btn.title='Play music';
-    if(lbl) lbl.textContent='No music';
-    if(bar) bar.style.opacity='.55';
+function stopIntroMusic() {
+  if (_introCtx) {
+    const ctx = _introCtx; _introCtx = null; _introMaster = null;
+    _introNodes.forEach(n=>{ try{n.stop();}catch(e){} });
+    _introNodes = [];
+    setTimeout(()=>{ try{ctx.close();}catch(e){} }, 300);
   }
-  // Refresh song select in settings if visible
-  const sel=document.getElementById('settings-song');
-  if(sel) sel.value=currentSongId;
 }
 
-window.playerToggle=function(){ if(musicPlaying) stopMusic(); else playMusic(currentSongId,true); };
-window.playerNext=function(){ const keys=Object.keys(SONGS); playMusic(keys[(keys.indexOf(currentSongId)+1)%keys.length],true); };
-window.playerPrev=function(){ const keys=Object.keys(SONGS); playMusic(keys[(keys.indexOf(currentSongId)-1+keys.length)%keys.length],true); };
-window.previewIntroMusic=function(){ playMusic(currentSongId,false); };
-function stopIntroMusic(){ stopMusic(); }
+function fadeOutIntroMusic(ms=2500) {
+  if (_introMaster && _introCtx) {
+    // Smoothly ramp master volume to silence over ms, then stop
+    const ctx = _introCtx;
+    _introMaster.gain.cancelScheduledValues(ctx.currentTime);
+    _introMaster.gain.setValueAtTime(_introMaster.gain.value, ctx.currentTime);
+    _introMaster.gain.linearRampToValueAtTime(0, ctx.currentTime + ms/1000);
+    setTimeout(()=>stopIntroMusic(), ms + 100);
+  } else {
+    stopIntroMusic();
+  }
+}
 
 // ════════════════════════════════════
 // SPLASH SCREEN
@@ -993,6 +942,11 @@ function spawnSparks() {
 }
 
 function initSplash() {
+  // Set nav button label based on context
+  var btn = document.getElementById('nav-download-btn');
+  if (btn) {
+    btn.textContent = window.electronAPI ? '⬆ UPDATE' : '⬇ DOWNLOAD APP';
+  }
   spawnSparks();
   const username=localStorage.getItem('mvndi_username')||'';
   const welcome=document.getElementById('splash-welcome');
@@ -1002,7 +956,7 @@ function initSplash() {
 
   let musicStarted=false;
   function startMusic(){
-    if(!musicStarted){ musicStarted=true; playMusic(currentSongId,true); }
+    if(!musicStarted){ musicStarted=true; playIntroMusic(); }
   }
 
   let canDismiss=false;
@@ -1020,7 +974,7 @@ function initSplash() {
         document.getElementById('username-prompt').classList.add('show');
       } else {
         // Returning user: music gently fades after ~12s unless they keep it on
-        setTimeout(()=>{ if(musicPlaying&&!_keepOn) fadeOutMusic(3000); }, 12000);
+        setTimeout(()=>{ fadeOutIntroMusic(3000); }, 12000);
       }
     },1400);
   }
@@ -1049,7 +1003,7 @@ window.submitUsername=function(){
   localStorage.setItem('mvndi_username',name);
   document.getElementById('username-prompt').classList.remove('show');
   // Music fades out after ~10s — they can keep it with the player
-  setTimeout(()=>{ if(musicPlaying&&!_keepOn) fadeOutMusic(3000); }, 10000);
+  setTimeout(()=>{ fadeOutIntroMusic(3000); }, 10000);
 };
 
 window.saveUsername=function(){
@@ -1726,37 +1680,10 @@ function renderSettings(){
   if(vSlider){ vSlider.value=vol; vSlider.style.background=`linear-gradient(90deg,var(--amber) ${vol}%,var(--border2) ${vol}%)`; }
   const vVal=document.getElementById('vol-val');
   if(vVal) vVal.textContent=vol+'%';
-  // Song library cards
-  const lib=document.getElementById('song-library');
-  if(lib){
-    lib.innerHTML=Object.entries(SONGS).map(([id,s])=>`
-      <div class="song-card${id===currentSongId?' active':''}" onclick="selectSong('${id}')">
-        <div class="song-card-dot"></div>
-        <div class="song-card-info">
-          <div class="song-card-name">${s.label}</div>
-          <div class="song-card-desc">${s.desc}</div>
-        </div>
-        <button class="song-card-btn" onclick="event.stopPropagation();playMusic('${id}',true);showToast('Now playing: ${s.label}')">▶</button>
-      </div>`).join('');
-  }
+
 }
 
-window.selectSong=function(id){
-  currentSongId=id;
-  localStorage.setItem('mvndi_song',id);
-  renderSettings();
-  updatePlayerUI();
-  showToast('Selected: '+SONGS[id].label+' — press ▶ to play');
-};
 
-let _keepOn=false;
-window.playerToggleKeep=function(){
-  _keepOn=!_keepOn;
-  const btn=document.getElementById('player-keep');
-  if(btn){ btn.classList.toggle('on',_keepOn); btn.title=_keepOn?'Loop ON — music will keep playing':'Loop OFF'; }
-  if(_keepOn && !musicPlaying) playMusic(currentSongId,true);
-  else if(!_keepOn && musicPlaying) musicLooping=false;
-};
 
 window.clearBrewLog=function(){
   showConfirm('Clear the entire brew log? All history and chart data will be lost.',()=>{
@@ -1820,6 +1747,19 @@ setTimeout(()=>{
 
 // Kick off the splash (must be last)
 initSplash();
+
+// ════════════════════════════════════
+// LOCK UP (hard quit)
+// ════════════════════════════════════
+window.lockUp = function() {
+  showConfirm('Lock up the brewery and close the app?', () => {
+    if (window.electronAPI) {
+      window.electronAPI.quit();
+    } else {
+      window.close(); // fallback for plain HTML preview
+    }
+  }, '🔒 LOCK UP');
+};
 </script>
 </body>
 </html>
