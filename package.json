@@ -1,0 +1,29 @@
+{
+  "name": "mvndicraft-brewery",
+  "version": "1.0.0",
+  "description": "MvndiCraft Brewery Companion",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.mvndicraft.brewery",
+    "productName": "MvndiCraft Brewery",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "shortcutName": "MvndiCraft Brewery"
+    },
+    "files": ["src/**", "assets/**", "main.js", "preload.js"]
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
