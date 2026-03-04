@@ -1240,8 +1240,7 @@ function _runTimer(id,name,end,total){
 }
 
 window.startTimer=function(name,secs){
-  const id=name.replace(/[^a-z0-9]/gi,'_')+'_cook';
-  if(timers[id]){showToast('Timer already running for '+name);return;}
+  const id=name.replace(/[^a-z0-9]/gi,'_')+'_cook_'+Date.now();
   const end=Date.now()+secs*1000;
   _runTimer(id,name,end,secs);
   saveCookTimers();
