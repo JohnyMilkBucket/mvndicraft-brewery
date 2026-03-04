@@ -1,6 +1,6 @@
 {
   "name": "mvndicraft-brewery",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "description": "MvndiCraft Brewery Companion",
   "main": "main.js",
   "scripts": {
@@ -10,6 +10,7 @@
   "build": {
     "appId": "com.mvndicraft.brewery",
     "productName": "MvndiCraft Brewery",
+    "artifactName": "MvndiCraft-Setup.exe",
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"
